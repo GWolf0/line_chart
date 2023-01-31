@@ -8,15 +8,17 @@ let drawArea;
 let maxYvalue;
 let xValues;
 let xStepSize;
+let points=[];//points representing y values of each record of each line data
 let compChartPadding;
 //refs
 const chartRef=useRef();
 const canRef=useRef();
+const valueIndicatorRef=useRef();
 //states
 
 //effects
 useEffect(()=>{
-    console.log('LOG: effect');
+    //console.log('LOG: effect');
     setupChart();
     drawChart();
     window.addEventListener('resize',onWindowResize);
@@ -25,12 +27,12 @@ useEffect(()=>{
 
 //methods
 function onWindowResize(){
-    console.log("LOG: onresize");
+    //console.log("LOG: onresize");
     setupChart();
     drawChart();
 }
 function setupChart(){
-    console.log("LOG: setup ")
+    //console.log("LOG: setup ")
     //setup canvas
     can=canRef.current;
     cc=can.getContext('2d');
@@ -52,7 +54,7 @@ function setupChart(){
             xValues.push(record.x);
         });
     });
-    xValues.sort();console.log(xValues)
+    xValues.sort();//console.log(xValues)
 }
 function drawChart(){
     console.log("LOG: draw");
@@ -80,19 +82,21 @@ function drawChart(){
     for(let x=0;x<xSteps;x++){
         let xPos=(x+1)*xStepSize+compChartPadding;
         drawLine({x:xPos,y:drawArea.y-5},{x:xPos,y:drawArea.y+5});
-        drawText(xValues[x].toString().substr(xValueOffs,Math.min(xValueMaxLen,xValues[x].toString().length)),xPos,drawArea.y-compChartPadding*0.95,textColor,true);
+        drawText(xValues[x].toString().substr(xValueOffs,Math.min(xValueMaxLen,xValues[x].toString().length)),xPos,drawArea.y-compChartPadding*0.25,textColor,true,25);
     }
     //chart lines
     drawChartLines();
 }
 function drawChartLines(){
+    points.length=0;
     let xValueIdx=0;
     data.data.forEach((lineData,i)=>{
-        console.log("in chart ",i)
+        //console.log("in chart ",i)
         lineData.data.forEach((record,j)=>{
-            console.log("in rec ",xValueIdx)
-            const point={x:(xValueIdx+1)*xStepSize+compChartPadding,y:yValueToPixel(record.y)+compChartPadding};
-            console.log(point);
+            //console.log("in rec ",xValueIdx)
+            const point={x:(xValueIdx+1)*xStepSize+compChartPadding,y:yValueToPixel(record.y)+compChartPadding,value:record.y,color:colors[i]};
+            points.push(point);
+            //console.log(point);
             const nextPoint=j+2>lineData.data.length?null:{x:(xValueIdx+2)*xStepSize+compChartPadding,y:yValueToPixel(lineData.data[j+1].y)+compChartPadding};
             const pointRadius=compChartPadding*0.1;
             drawCircle(point,pointRadius,colors[i]);
@@ -100,6 +104,34 @@ function drawChartLines(){
             xValueIdx++;
         });
     });
+}
+function drawPointerLine(localMousePos){
+    drawChart();
+    let snaped=null;
+    for(let i=0;i<points.length;i++){
+        const point=points[i];
+        if(Math.abs(point.x-localMousePos.x)<10){
+            localMousePos.x=point.x;
+            snaped=point;
+            break;
+        }
+    }
+    drawLine({x:localMousePos.x,y:0},{x:localMousePos.x,y:can.height},textColor,true);
+    if(snaped!=null){
+        drawLine({x:0,y:snaped.y},{x:can.width,y:snaped.y},textColor,true);
+        valueIndicatorRef.current.children[0].innerText=snaped.value;
+        valueIndicatorRef.current.style.backgroundColor=snaped.color;
+        valueIndicatorRef.current.style.left=`${snaped.x}px`;
+        valueIndicatorRef.current.style.bottom=`${snaped.y}px`;
+    }
+}
+
+//events
+function onMouseMove(e){
+    const mousePos={x:e.clientX,y:e.clientY};
+    const canvasBR=can.getBoundingClientRect();
+    const localMousePos={x:mousePos.x-canvasBR.x,y:mousePos.y-canvasBR.y};
+    drawPointerLine(localMousePos);
 }
 
 //helpers
@@ -112,7 +144,8 @@ function pixelToYValue(px){//unit to pixel function
 function yValueToPixel(yval){//unit to pixel function
     return yval*(drawArea.h-drawArea.y)/maxYvalue;
 }
-function drawLine(from,to,color=textColor){
+function drawLine(from,to,color=textColor,dashed=false){
+    cc.setLineDash(dashed?[5]:[]);
     cc.strokeStyle=color;
     cc.beginPath();
     cc.moveTo(from.x,flipY(from.y));
@@ -127,22 +160,29 @@ function drawCircle(center,radius,color=textColor){
     cc.fill();
     cc.closePath();
 }
-function drawText(txt,x,y,color=textColor,center=false){
+function drawText(txt,x,y,color=textColor,center=false,angle=0){
+    cc.save();
     cc.font=`${Math.floor(compChartPadding*0.25)}px arial`;
     cc.fillStyle=color;
     const textWidth=cc.measureText(txt).width;
     let xpos=center?x-textWidth*0.5:x;
-    cc.fillText(txt,xpos,flipY(y));
+    cc.translate(xpos,flipY(y));
+    cc.rotate(angle*Math.PI/180);
+    cc.fillText(txt,0,0);
+    cc.restore();
 }
 
 
 return(
-<div ref={chartRef} className="lineChart" style={{height:'fit-content',backgroundColor:bgColor,display:'grid',gridTemplateRows:'60px auto 60px',border:'1px solid rgba(0,0,0,0.25)'}}>
+<div ref={chartRef} className="lineChart" style={{height:'fit-content',backgroundColor:bgColor,display:'grid',gridTemplateRows:'60px auto 60px',border:'1px solid rgba(0,0,0,0.25)',borderRadius:'4px',overflow:'hidden'}}>
     <section className="lineChartHeader" style={{borderBottom:'1px solid rgba(0,0,0,0.25)',display:'flex',flexDirection:'row',alignItems:'center',padding:'0 0.5rem'}}>
-        <p style={{color:textColor,fontSize:'1.2rem'}}>{data.title}</p>
+        <p style={{color:textColor,fontSize:'1.2rem',fontWeight:'bold'}}>{data.title}</p>
     </section>
-    <section className="lineChartBody" style={{aspectRatio:'2',backgroundColor:chartBgColor}}>
-        <canvas id="can" ref={canRef}></canvas>
+    <section className="lineChartBody" style={{position:'relative',aspectRatio:'2',backgroundColor:chartBgColor}}>
+        <canvas id="can" ref={canRef} onMouseMove={onMouseMove}></canvas>
+        <div ref={valueIndicatorRef} className="valueIndicator" style={{position:'absolute',left:`-1000px`,bottom:`-1000px`,padding:'0.25rem 0.5rem',backgroundColor:bgColor,borderRadius:'2px'}}>
+            <p style={{color:'#eee',textAlign:'center',fontSize:'0.75rem'}}>test</p>
+        </div>
     </section>
     <section className="lineChartFooter" style={{borderTop:'1px solid rgba(0,0,0,0.25)',display:'flex',flexDirection:'row',alignItems:'center',padding:'0 0.5rem'}}>
         {
