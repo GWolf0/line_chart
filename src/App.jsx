@@ -7,7 +7,7 @@ function App(){
   return (
     <div className="App" style={{width:'100vw',minHeight:'100vh',backgroundColor:'#212121'}}>
       <div className="innerContainer" style={{width:'100%',maxWidth:'1280px',padding:'2rem 0.5rem',margin:'0 auto'}}>
-        <LineChart data={data} xValueOffs={4} />
+        <LineChart data={data} xValueOffs={0} xValueMaxLen={6} />
       </div>
     </div>
   )

@@ -48,16 +48,16 @@ function setupChart(){
             }
         });
     });
-    xValues=[];
+    xValues=new Set();
     data.data.forEach((lineData,i)=>{
-        lineData.data.forEach((record,j)=>{
-            xValues.push(record.x);
+        lineData.data.forEach((record,j)=>{//console.log(record.x)
+            xValues.add(record.x.toString());
         });
     });
-    xValues.sort();//console.log(xValues)
+    xValues=Array.from(xValues).sort();console.log(xValues)
 }
 function drawChart(){
-    console.log("LOG: draw");
+    //console.log("LOG: draw");
     //calculate draw area
     drawArea={x:compChartPadding,y:compChartPadding,w:can.width-compChartPadding,h:can.height-compChartPadding};
     //background
@@ -82,36 +82,40 @@ function drawChart(){
     for(let x=0;x<xSteps;x++){
         let xPos=(x+1)*xStepSize+compChartPadding;
         drawLine({x:xPos,y:drawArea.y-5},{x:xPos,y:drawArea.y+5});
-        drawText(xValues[x].toString().substr(xValueOffs,Math.min(xValueMaxLen,xValues[x].toString().length)),xPos,drawArea.y-compChartPadding*0.25,textColor,true,25);
+        drawText(xValues[x].substr(xValueOffs,Math.min(xValueMaxLen,xValues[x].length)),xPos,drawArea.y-compChartPadding*0.25,textColor,true,25);
     }
     //chart lines
     drawChartLines();
 }
 function drawChartLines(){
     points.length=0;
-    let xValueIdx=0;
+    //let xValueIdx=0;
     data.data.forEach((lineData,i)=>{
         //console.log("in chart ",i)
         lineData.data.forEach((record,j)=>{
             //console.log("in rec ",xValueIdx)
-            const point={x:(xValueIdx+1)*xStepSize+compChartPadding,y:yValueToPixel(record.y)+compChartPadding,value:record.y,color:colors[i]};
+            const yValue=record.y;
+            const xValueIdx=xValues.indexOf(record.x.toString());//console.log('xidx',record.x,xValueIdx)
+            const point={x:(xValueIdx+1)*xStepSize+compChartPadding,y:yValueToPixel(yValue)+compChartPadding,value:yValue,color:colors[i]};
             points.push(point);
             //console.log(point);
             const nextPoint=j+2>lineData.data.length?null:{x:(xValueIdx+2)*xStepSize+compChartPadding,y:yValueToPixel(lineData.data[j+1].y)+compChartPadding};
             const pointRadius=compChartPadding*0.1;
             drawCircle(point,pointRadius,colors[i]);
             if(nextPoint)drawLine(point,nextPoint,colors[i]);
-            xValueIdx++;
+            //xValueIdx++;
         });
     });
 }
 function drawPointerLine(localMousePos){
     drawChart();
     let snaped=null;
+    const snapDistance=can.width*0.02;//console.log(snapDistance)
     for(let i=0;i<points.length;i++){
         const point=points[i];
-        if(Math.abs(point.x-localMousePos.x)<10){
+        if(Math.abs(point.x-localMousePos.x)<snapDistance&&Math.abs(point.y-localMousePos.y)<snapDistance){
             localMousePos.x=point.x;
+            localMousePos.y=point.y;
             snaped=point;
             break;
         }
@@ -130,7 +134,7 @@ function drawPointerLine(localMousePos){
 function onMouseMove(e){
     const mousePos={x:e.clientX,y:e.clientY};
     const canvasBR=can.getBoundingClientRect();
-    const localMousePos={x:mousePos.x-canvasBR.x,y:mousePos.y-canvasBR.y};
+    const localMousePos={x:mousePos.x-canvasBR.x,y:flipY(mousePos.y-canvasBR.y)};
     drawPointerLine(localMousePos);
 }
 
